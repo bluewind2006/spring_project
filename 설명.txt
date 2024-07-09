@@ -1,0 +1,304 @@
+DocumentBuilderFactory는 Java의 XML 파서 API에서 사용되는 클래스입니다. 보안 기능을 설정하여 XML 파서가 잠재적인 보안 취약점을 방어하도록 할 수 있습니다. 이를 통해 XML 외부 엔터티 주입(XXE), XML 폭탄 공격, 및 기타 보안 위협을 방지할 수 있습니다.
+
+주요 보안 기능 및 설정
+1. 외부 엔터티 해석 비활성화 (Preventing XXE Attacks)
+XML 외부 엔터티는 XML 문서 내부에서 다른 리소스를 참조할 수 있게 하는 기능입니다. 이를 악용한 XXE 공격을 방지하기 위해 외부 엔터티 해석을 비활성화합니다.
+
+java
+코드 복사
+DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+dbf.setExpandEntityReferences(false);
+이 설정은 XML 파서가 외부 엔터티를 로드하지 않도록 하여 XXE 공격을 방지합니다.
+
+2. DOCTYPE 선언 비활성화 (Disabling DOCTYPE Declaration)
+XML 폭탄 공격을 방지하기 위해 DOCTYPE 선언을 비활성화합니다. 이는 XML 문서의 DOCTYPE을 통해 많은 양의 엔터티를 정의하여 메모리 과부하를 유발하는 공격입니다.
+
+java
+코드 복사
+dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+이 설정은 DOCTYPE 선언을 금지하여 XML 폭탄 공격을 방지합니다.
+
+3. 안전한 XML 처리 설정 (Secure Processing)
+XML 파서가 보안 모드로 동작하도록 하여 공격을 방지합니다. 이는 XML 파서가 외부 리소스를 로드하지 않도록 하고, 가능한 보안 취약점을 최소화합니다.
+
+java
+코드 복사
+dbf.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
+이 설정은 XML 파서가 보안 모드에서 동작하도록 하여 다양한 보안 위협을 방지합니다.
+
+전체 설정 예제
+아래는 위의 보안 기능을 모두 포함한 DocumentBuilderFactory 설정 예제입니다:
+
+java
+코드 복사
+package com.example.xml;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
+@Configuration
+public class XmlConfig {
+
+    @Bean
+    public DocumentBuilderFactory documentBuilderFactory() throws ParserConfigurationException, SAXException {
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+        dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        dbf.setExpandEntityReferences(false);
+        dbf.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        dbf.setXIncludeAware(false);
+        return dbf;
+    }
+}
+주요 보안 설정 요약
+http://xml.org/sax/features/external-general-entities: 외부 일반 엔터티 해석 비활성화.
+http://xml.org/sax/features/external-parameter-entities: 외부 파라미터 엔터티 해석 비활성화.
+http://apache.org/xml/features/nonvalidating/load-external-dtd: 외부 DTD 로딩 비활성화.
+http://apache.org/xml/features/disallow-doctype-decl: DOCTYPE 선언 비활성화.
+javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING: 보안 모드에서 XML 파서 동작.
+setExpandEntityReferences(false): 엔터티 참조 확장 비활성화.
+이러한 설정을 통해 XML 파서를 안전하게 구성하여 다양한 보안 위협을 방지할 수 있습니다.
+
+
+
+
+DocumentBuilderFactory를 사용하는 방법 외에도 다양한 방법으로 XXE(외부 엔터티 주입) 공격을 방어할 수 있습니다. XML 파서와 관련된 다양한 라이브러리와 프레임워크에서 XXE 공격을 방어하기 위한 설정을 제공하고 있습니다. 아래는 몇 가지 대안을 설명합니다.
+
+1. SAXParserFactory 사용
+SAX 파서는 XML 문서를 순차적으로 읽으며 처리하기 때문에 메모리 사용량이 적습니다. SAXParserFactory를 사용하여 XXE를 방어할 수 있습니다.
+
+java
+코드 복사
+import javax.xml.parsers.SAXParserFactory;
+import javax.xml.parsers.SAXParser;
+import org.xml.sax.XMLReader;
+import org.xml.sax.helpers.DefaultHandler;
+
+public class SecureSAXParser {
+    public static void main(String[] args) throws Exception {
+        SAXParserFactory spf = SAXParserFactory.newInstance();
+        spf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        spf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        spf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        spf.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        spf.setXIncludeAware(false);
+
+        SAXParser saxParser = spf.newSAXParser();
+        XMLReader xmlReader = saxParser.getXMLReader();
+        xmlReader.setContentHandler(new DefaultHandler());
+        xmlReader.parse(new InputSource(new StringReader(xmlData)));
+    }
+}
+2. StAX (Streaming API for XML)
+StAX는 XML 문서를 스트리밍 방식으로 처리하는 API입니다. XMLInputFactory를 사용하여 XXE를 방어할 수 있습니다.
+
+java
+코드 복사
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamReader;
+import javax.xml.stream.XMLStreamConstants;
+import java.io.StringReader;
+
+public class SecureStAXParser {
+    public static void main(String[] args) throws Exception {
+        XMLInputFactory xif = XMLInputFactory.newInstance();
+        xif.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+        xif.setProperty("javax.xml.stream.isSupportingExternalEntities", false);
+
+        XMLStreamReader xsr = xif.createXMLStreamReader(new StringReader(xmlData));
+        while (xsr.hasNext()) {
+            int eventType = xsr.next();
+            if (eventType == XMLStreamConstants.START_ELEMENT) {
+                // XML 데이터 처리
+            }
+        }
+    }
+}
+3. DOM4J
+DOM4J는 XML 파싱 및 처리용 오픈 소스 프레임워크입니다. SAXReader를 사용하여 XXE를 방어할 수 있습니다.
+
+java
+코드 복사
+import org.dom4j.io.SAXReader;
+import org.xml.sax.EntityResolver;
+import org.xml.sax.InputSource;
+
+public class SecureDOM4JParser {
+    public static void main(String[] args) throws Exception {
+        SAXReader reader = new SAXReader();
+        reader.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        reader.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        reader.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        reader.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
+
+        reader.setEntityResolver(new EntityResolver() {
+            public InputSource resolveEntity(String publicId, String systemId) {
+                return new InputSource(new StringReader(""));
+            }
+        });
+
+        reader.read(new StringReader(xmlData));
+    }
+}
+4. JAXB (Java Architecture for XML Binding)
+JAXB는 자바 객체를 XML로 변환하고, XML을 자바 객체로 변환하는 데 사용됩니다. Unmarshaller를 설정하여 XXE를 방어할 수 있습니다.
+
+java
+코드 복사
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.Unmarshaller;
+import javax.xml.XMLConstants;
+import javax.xml.validation.SchemaFactory;
+
+public class SecureJAXBParser {
+    public static void main(String[] args) throws Exception {
+        JAXBContext jc = JAXBContext.newInstance(MyClass.class);
+        Unmarshaller unmarshaller = jc.createUnmarshaller();
+
+        SchemaFactory sf = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+        unmarshaller.setSchema(sf.newSchema());
+
+        unmarshaller.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        unmarshaller.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+
+        MyClass myObject = (MyClass) unmarshaller.unmarshal(new StringReader(xmlData));
+    }
+}
+5. Apache Xerces
+Apache Xerces는 XML 파싱을 위한 라이브러리입니다. SAXParserFactory와 유사하게 설정할 수 있습니다.
+
+java
+코드 복사
+import org.apache.xerces.jaxp.SAXParserFactoryImpl;
+import javax.xml.parsers.SAXParser;
+import org.xml.sax.XMLReader;
+import org.xml.sax.helpers.DefaultHandler;
+
+public class SecureXercesParser {
+    public static void main(String[] args) throws Exception {
+        SAXParserFactory spf = new SAXParserFactoryImpl();
+        spf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        spf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        spf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+        spf.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        spf.setXIncludeAware(false);
+
+        SAXParser saxParser = spf.newSAXParser();
+        XMLReader xmlReader = saxParser.getXMLReader();
+        xmlReader.setContentHandler(new DefaultHandler());
+        xmlReader.parse(new InputSource(new StringReader(xmlData)));
+    }
+}
+이러한 방법들을 통해 다양한 XML 파서에서 XXE 공격을 방어할 수 있습니다. 각 방법은 특정 상황에 맞게 적용할 수 있으며, 보안 설정을 통해 XML 파서를 안전하게 구성할 수 있습니다.
+
+
+
+
+
+----------------------------------
+XmlConfig.java 메소드 설명
+XmlConfig.java는 Spring의 구성 클래스입니다. 이 클래스는 XML 파서와 관련된 Bean을 정의하고 설정합니다.
+
+1. documentBuilderFactory()
+java
+코드 복사
+@Bean
+public DocumentBuilderFactory documentBuilderFactory() throws ParserConfigurationException, SAXException {
+    DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+    dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+    dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+    dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+    dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+    dbf.setXIncludeAware(false);
+    dbf.setExpandEntityReferences(false);
+    dbf.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
+    return dbf;
+}
+이 메소드는 DocumentBuilderFactory 인스턴스를 생성하고 설정합니다. 주요 보안 설정은 다음과 같습니다:
+
+DOCTYPES 비활성화: disallow-doctype-decl을 true로 설정하여 DOCTYPE 선언을 금지합니다. 이는 XXE 공격을 방지하는 데 중요합니다.
+외부 엔터티 비활성화: external-general-entities와 external-parameter-entities를 false로 설정하여 외부 엔터티를 로드하지 않도록 합니다.
+외부 DTD 로딩 비활성화: load-external-dtd를 false로 설정하여 외부 DTD 로딩을 금지합니다.
+보안 처리 모드 활성화: FEATURE_SECURE_PROCESSING을 true로 설정하여 보안 모드에서 XML 파서를 동작하도록 합니다.
+2. xPathFactory()
+java
+코드 복사
+@Bean
+public XPathFactory xPathFactory() {
+    try {
+        XPathFactory xPathFactory = XPathFactory.newInstance();
+        xPathFactory.setFeature(javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING, true);
+        return xPathFactory;
+    } catch (XPathFactoryConfigurationException e) {
+        throw new RuntimeException("Error configuring XPathFactory", e);
+    }
+}
+이 메소드는 XPathFactory 인스턴스를 생성하고 보안 설정을 적용합니다:
+
+보안 처리 모드 활성화: FEATURE_SECURE_PROCESSING을 true로 설정하여 XPath 평가 시 보안을 강화합니다.
+3. saxonProcessor()
+java
+코드 복사
+@Bean
+public Processor saxonProcessor() {
+    Processor processor = new Processor(false);
+    processor.getUnderlyingConfiguration().setBooleanProperty(FeatureKeys.ALLOW_EXTERNAL_FUNCTIONS, false);
+    return processor;
+}
+이 메소드는 Saxon의 Processor 인스턴스를 생성하고 설정합니다:
+
+외부 함수 비활성화: ALLOW_EXTERNAL_FUNCTIONS를 false로 설정하여 XQuery 평가 시 외부 함수를 비활성화합니다.
+XmlService.java 메소드 설명
+XmlService.java는 XML 및 XQuery 처리를 담당하는 서비스 클래스입니다. 이 클래스는 주입된 DocumentBuilderFactory, XPathFactory, 및 Processor를 사용하여 XML을 처리합니다.
+
+1. evaluateXPath()
+java
+코드 복사
+public String evaluateXPath(String xml, String expression) throws ParserConfigurationException, IOException, SAXException, XPathExpressionException {
+    DocumentBuilder builder = documentBuilderFactory.newDocumentBuilder();
+    Document document = builder.parse(new InputSource(new StringReader(xml)));
+
+    XPath xPath = xPathFactory.newXPath();
+    return xPath.evaluate(expression, document);
+}
+이 메소드는 XML 문자열을 파싱하고 주어진 XPath 표현식을 평가하여 결과를 반환합니다:
+
+XML 파싱: DocumentBuilder를 사용하여 XML 문자열을 Document 객체로 파싱합니다.
+XPath 평가: 주입된 XPathFactory를 사용하여 XPath 인스턴스를 생성하고, 주어진 XPath 표현식을 평가합니다.
+2. evaluateXQuery()
+java
+코드 복사
+public String evaluateXQuery(String xml, String expression, String parameter) throws SaxonApiException {
+    net.sf.saxon.s9api.DocumentBuilder saxonBuilder = saxonProcessor.newDocumentBuilder();
+    XdmNode document = saxonBuilder.build(new StreamSource(new StringReader(xml)));
+
+    XQueryCompiler compiler = saxonProcessor.newXQueryCompiler();
+    XQueryExecutable executable = compiler.compile(expression);
+    XQueryEvaluator evaluator = executable.load();
+
+    evaluator.setContextItem(document);
+    evaluator.setExternalVariable(new QName("param"), new XdmAtomicValue(parameter));
+
+    XdmValue result = evaluator.evaluate();
+    return result.toString();
+}
+이 메소드는 XML 문자열을 파싱하고 주어진 XQuery 표현식을 평가하여 결과를 반환합니다:
+
+XML 파싱: Saxon의 DocumentBuilder를 사용하여 XML 문자열을 XdmNode 객체로 파싱합니다.
+XQuery 컴파일 및 평가: XQueryCompiler를 사용하여 XQuery 표현식을 컴파일하고, XQueryEvaluator를 통해 평가합니다. 이 과정에서 주어진 파라미터를 외부 변수로 설정합니다.
+이 두 클래스는 안전하게 XML과 XQuery를 처리하기 위해 다양한 보안 설정을 적용하고 있습니다. XmlConfig 클래스는 XML 파서와 XQuery 프로세서의 보안 설정을 관리하며, XmlService 클래스는 이러한 설정을 사용하여 XML 데이터를 안전하게 처리합니다.
+
+
+
+
+
+
