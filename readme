@@ -1,511 +1,321 @@
 spring project
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
 
-/* JADX WARN: Classes with same name are omitted:
-  common-lib-1.0.14.jar:com/kt/idc/common/mask/Mask.class
- */
-@Target({ElementType.FIELD})
-@Retention(RetentionPolicy.RUNTIME)
-/* loaded from: common-lib-1.0.9.jar:com/kt/idc/common/mask/Mask.class */
-public @interface Mask {
-    MaskRule rule();
+--------------------------------
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.util.Properties;
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.codec.binary.Hex;
+
+public class Aes128 {
+    private final SecretKey keySpec;
+    private final IvParameterSpec ivSpec;
+
+    public Aes128(String keyFile, String keyName) throws IOException, InvalidKeyException, DecoderException {
+        File keyStore = new File(keyFile);
+        FileInputStream fis = null;
+        String secretKey = null;
+        try {
+            try {
+                fis = new FileInputStream(keyStore);
+                Properties props = new Properties();
+                props.load(fis);
+                secretKey = props.getProperty(keyName);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                System.exit(0);
+                fis.close();
+            }
+            if (secretKey == null || secretKey.trim().contentEquals("")) {
+                throw new Exception(String.valueOf(keyName) + "으로 설정된 key가 존재하지 않습니다.");
+            }
+            fis.close();
+            byte[] secretKeyBytes = Hex.decodeHex(secretKey);
+            if (secretKeyBytes.length != 16) {
+                throw new InvalidKeyException("Invalid key (key length is not valid) ");
+            }
+            byte[] ivBytes = new byte[16];
+            System.arraycopy(secretKeyBytes, 0, ivBytes, 0, 16);
+            this.keySpec = new SecretKeySpec(secretKeyBytes, "AES");
+            this.ivSpec = new IvParameterSpec(ivBytes);
+        } catch (Throwable th) {
+            fis.close();
+            throw th;
+        }
+    }
+
+    public Aes128(String secretKey) throws IOException, InvalidKeyException, DecoderException {
+        byte[] secretKeyBytes = Hex.decodeHex(secretKey);
+        if (secretKeyBytes.length != 16) {
+            throw new InvalidKeyException("Invalid key (key length is not valid) ");
+        }
+        byte[] ivBytes = new byte[16];
+        System.arraycopy(secretKeyBytes, 0, ivBytes, 0, 16);
+        this.keySpec = new SecretKeySpec(secretKeyBytes, "AES");
+        this.ivSpec = new IvParameterSpec(ivBytes);
+    }
+
+    public String encrypt(String plainStr) throws CryptoException {
+        if (plainStr == null) {
+            return null;
+        }
+        try {
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(1, this.keySpec, this.ivSpec);
+            byte[] encrypted = cipher.doFinal(plainStr.getBytes("UTF-8"));
+            String encryptedStr = new String(Base64.encodeBase64(encrypted));
+            return encryptedStr;
+        } catch (Exception ex) {
+            throw new CryptoException(ex.getMessage());
+        }
+    }
+
+    public String decrypt(String encryptedStr) throws CryptoException {
+        if (encryptedStr == null) {
+            return null;
+        }
+        try {
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(2, this.keySpec, this.ivSpec);
+            byte[] byteStr = Base64.decodeBase64(encryptedStr.getBytes("UTF-8"));
+            String decryptedStr = new String(cipher.doFinal(byteStr), "UTF-8");
+            return decryptedStr;
+        } catch (Exception ex) {
+            throw new CryptoException(ex.getMessage());
+        }
+    }
 }
 
------------------------------------------------------
-public enum MaskRule {
-    NAME,
-    PASSPORT,
-    PHONE,
-    EMAIL,
-    BANK_ACCOUNT,
-    IPV4;
+---------------------------------
+public class CryptoException extends Exception {
+    private static final long serialVersionUID = 6130083501304830088L;
+    private String errorMsg;
 
-    /* renamed from: values, reason: to resolve conflict with enum method */
-    public static MaskRule[] valuesCustom() {
-        MaskRule[] valuesCustom = values();
-        int length = valuesCustom.length;
-        MaskRule[] maskRuleArr = new MaskRule[length];
-        System.arraycopy(valuesCustom, 0, maskRuleArr, 0, length);
-        return maskRuleArr;
+    public CryptoException(String errorMsg) {
+        super(errorMsg);
+        setErrorMsg(errorMsg);
+    }
+
+    public String getErrorMsg() {
+        return this.errorMsg;
+    }
+
+    public void setErrorMsg(String errorMsg) {
+        this.errorMsg = errorMsg;
     }
 }
----------------------------------------------------------------------------
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.regex.Pattern;
+----------------------------------------
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.SecureRandom;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.RSAPublicKeySpec;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Properties;
+import javax.crypto.Cipher;
+import org.apache.commons.codec.binary.Base64;
 
-/* JADX WARN: Classes with same name are omitted:
-  common-lib-1.0.14.jar:com/kt/idc/common/mask/MaskUtil.class
- */
-/* loaded from: common-lib-1.0.9.jar:com/kt/idc/common/mask/MaskUtil.class */
-public class MaskUtil {
-    private static Pattern enNamePattern = Pattern.compile("^[0-9a-zA-Z !@#$%^&*(),.?]*$");
+public class RSAManager {
+    private String sPublicKey;
+    private String sPrivateKey;
+    private String publicKeyModulus;
+    private String publicKeyExponent;
 
-    public static Object maskVo(Object voObj) throws IllegalArgumentException, IllegalAccessException {
-        Field[] fields = voObj.getClass().getDeclaredFields();
-        for (Field field : fields) {
-            Class<?> fieldType = field.getType();
-            if (fieldType == String.class) {
-                Annotation[] annotations = field.getDeclaredAnnotations();
-                for (Annotation annotation : annotations) {
-                    if (annotation instanceof Mask) {
-                        Mask maskAnnotation = (Mask) annotation;
-                        field.setAccessible(true);
-                        field.set(voObj, mask((String) field.get(voObj), maskAnnotation.rule()));
-                    }
-                }
-            } else if (fieldType == List.class) {
-                Annotation[] annotations2 = field.getDeclaredAnnotations();
-                for (Annotation annotation2 : annotations2) {
-                    if (annotation2 instanceof Mask) {
-                        Mask maskAnnotation2 = (Mask) annotation2;
-                        field.setAccessible(true);
-                        List<String> fieldList = (List) field.get(voObj);
-                        List<String> newList = new ArrayList<>();
-                        for (int i = 0; i < fieldList.size(); i++) {
-                            newList.add(mask(fieldList.get(i), maskAnnotation2.rule()));
-                        }
-                        field.set(voObj, newList);
-                    }
-                }
-            } else if (fieldType == String[].class) {
-                Annotation[] annotations3 = field.getDeclaredAnnotations();
-                for (Annotation annotation3 : annotations3) {
-                    if (annotation3 instanceof Mask) {
-                        Mask maskAnnotation3 = (Mask) annotation3;
-                        field.setAccessible(true);
-                        String[] fieldArr = (String[]) field.get(voObj);
-                        String[] newArr = new String[fieldArr.length];
-                        for (int i2 = 0; i2 < fieldArr.length; i2++) {
-                            newArr[i2] = mask(fieldArr[i2], maskAnnotation3.rule());
-                        }
-                        field.set(voObj, newArr);
-                    }
-                }
+    public RSAManager() {
+        this.sPublicKey = null;
+        this.sPrivateKey = null;
+        this.publicKeyModulus = null;
+        this.publicKeyExponent = null;
+    }
+
+    public String getPublicKey() {
+        return this.sPublicKey;
+    }
+
+    public String getPrivateKey() {
+        return this.sPrivateKey;
+    }
+
+    public RSAManager(String keyFile, String publicKeyName, String privateKeyName) throws IOException {
+        this.sPublicKey = null;
+        this.sPrivateKey = null;
+        this.publicKeyModulus = null;
+        this.publicKeyExponent = null;
+        File keyStore = new File(keyFile);
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(keyStore);
+            Properties props = new Properties();
+            props.load(fis);
+            this.sPublicKey = props.getProperty(publicKeyName);
+            this.sPrivateKey = props.getProperty(privateKeyName);
+            if (this.sPublicKey == null || this.sPublicKey.trim().contentEquals("")) {
+                throw new Exception(String.valueOf(this.sPublicKey) + "으로 설정된 key가 존재하지 않습니다.");
             }
-        }
-        return voObj;
-    }
-
-    public static List<Object> maskVoList(List<Object> listVo) throws NoSuchFieldException, SecurityException, IllegalArgumentException, IllegalAccessException {
-        List<Object> newList = new ArrayList<>();
-        for (Object vo : listVo) {
-            newList.add(maskVo(vo));
-        }
-        return newList;
-    }
-
-    public static void main(String[] args) throws IllegalArgumentException, IllegalAccessException {
-        TestVO vo = TestVO.builder().name("김성태").enName("Seongtae Kim").passport("M19451234").phone1("02-1234-7748").phone2("01032957748").email("stkim7@gmail.com").bankAccount("335-328568-01-003").ipv4("192.168.32.1").names(new String[]{"홍길동", "James Lee", "Gildong Hong"}).emailList(Arrays.asList("stkim7@gmail.com", "kz0909@naver.com")).build();
-        System.out.println(vo.toString());
-        maskVo(vo);
-        System.out.println(vo.toString());
-    }
-
-    public static String mask(String inputStr, MaskRule maskRule) {
-        String inStr = nvl(inputStr);
-        StringBuffer sbRtn = new StringBuffer();
-        int inStrLength = inStr.length();
-        if (maskRule == MaskRule.NAME) {
-            if (enNamePattern.matcher(inStr).matches()) {
-                int maskLength = new BigDecimal(inStr.length()).divide(new BigDecimal(3), 4).intValue();
-                if (inStrLength > 2) {
-                    sbRtn.append(inStr.substring(0, inStrLength - maskLength)).append(padding(maskLength));
-                } else {
-                    sbRtn.append(inStr);
-                }
-            } else if (inStrLength <= 1) {
-                sbRtn.append(inStr);
-            } else {
-                sbRtn.append(inStr.substring(0, inStrLength - 1)).append(padding(1));
+            if (this.sPrivateKey == null || this.sPrivateKey.trim().contentEquals("")) {
+                throw new Exception(String.valueOf(this.sPrivateKey) + "으로 설정된 key가 존재하지 않습니다.");
             }
-        } else if (maskRule == MaskRule.PASSPORT) {
-            sbRtn.append(inStr.substring(0, inStrLength - 4)).append(padding(4));
-        } else if (maskRule == MaskRule.PHONE) {
-            String phoneStr = inStr.replaceAll("[^0-9]", "");
-            if (phoneStr.startsWith("02")) {
-                sbRtn.append("02-");
-                if (phoneStr.length() == 9) {
-                    sbRtn.append(phoneStr.substring(2, 3)).append(padding(2)).append("-").append(padding(2)).append(phoneStr.substring(7));
-                } else if (phoneStr.length() == 10) {
-                    sbRtn.append(phoneStr.substring(2, 4)).append(padding(2)).append("-").append(padding(2)).append(phoneStr.substring(8));
-                }
-            } else if (phoneStr.length() == 10) {
-                sbRtn.append(phoneStr.substring(0, 3)).append("-").append(phoneStr.substring(3, 4)).append(padding(2)).append("-").append(padding(2)).append(phoneStr.substring(9));
-            } else if (phoneStr.length() == 11) {
-                int phoneStrLength = phoneStr.length();
-                int firstLength = phoneStrLength - 8;
-                sbRtn.append(phoneStr.substring(0, firstLength)).append("-").append(phoneStr.substring(firstLength, firstLength + 2)).append(padding(2)).append("-").append(padding(2)).append(phoneStr.substring(firstLength + 6));
-            }
-        } else if (maskRule == MaskRule.EMAIL) {
-            if (inStr.contains("@")) {
-                String[] token = inStr.split("@");
-                int idLength = token[0].length();
-                if (idLength >= 3) {
-                    sbRtn.append(inStr.substring(0, idLength - 3)).append(padding(3)).append("@").append(token[1]);
-                }
-            }
-        } else if (maskRule == MaskRule.BANK_ACCOUNT) {
-            sbRtn.append(inStr.substring(0, 6)).append(padding(inStrLength - 6));
-        } else if (maskRule == MaskRule.IPV4) {
-            String[] token2 = inStr.split("\\.");
-            sbRtn.append(padding(token2[0].length())).append(".").append(token2[1]).append(".").append(padding(token2[2].length())).append(".").append(token2[3]);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            System.exit(0);
+        } finally {
+            fis.close();
         }
-        return sbRtn.toString();
     }
 
-    private static String nvl(String inputStr) {
-        return inputStr != null ? inputStr.trim() : "";
+    public String encrypt(String value) throws Exception {
+        byte[] bPublicKey2 = Base64.decodeBase64(this.sPublicKey.getBytes());
+        KeyFactory keyFactory2 = KeyFactory.getInstance("RSA");
+        X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(bPublicKey2);
+        PublicKey publicKey = keyFactory2.generatePublic(publicKeySpec);
+        Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        cipher.init(1, publicKey);
+        byte[] bCipher = cipher.doFinal(value.getBytes());
+        String sCipherBase64 = Base64.encodeBase64String(bCipher);
+        return sCipherBase64;
     }
 
-    private static String padding(int number) {
-        StringBuffer sb = new StringBuffer();
-        for (int i = 0; i < number; i++) {
-            sb.append("*");
+    public String decrypt(String value) throws Exception {
+        byte[] bPrivateKey = Base64.decodeBase64(this.sPrivateKey.getBytes());
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(bPrivateKey);
+        PrivateKey privateKey = keyFactory.generatePrivate(privateKeySpec);
+        Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        byte[] bCipher = Base64.decodeBase64(value.getBytes());
+        cipher.init(2, privateKey);
+        byte[] bPlain = cipher.doFinal(bCipher);
+        String sPlain = new String(bPlain);
+        return sPlain;
+    }
+
+    public String encrypt(String sPublicKey, String value) throws Exception {
+        byte[] bPublicKey2 = Base64.decodeBase64(sPublicKey.getBytes());
+        KeyFactory keyFactory2 = KeyFactory.getInstance("RSA");
+        X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(bPublicKey2);
+        PublicKey publicKey = keyFactory2.generatePublic(publicKeySpec);
+        Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        cipher.init(1, publicKey);
+        byte[] bCipher = cipher.doFinal(value.getBytes());
+        String sCipherBase64 = Base64.encodeBase64String(bCipher);
+        return sCipherBase64;
+    }
+
+    public String decrypt(String sPrivateKey, String value) throws Exception {
+        byte[] bPrivateKey = Base64.decodeBase64(sPrivateKey.getBytes());
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        PKCS8EncodedKeySpec privateKeySpec = new PKCS8EncodedKeySpec(bPrivateKey);
+        PrivateKey privateKey = keyFactory.generatePrivate(privateKeySpec);
+        Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        byte[] bCipher = Base64.decodeBase64(value.getBytes());
+        cipher.init(2, privateKey);
+        byte[] bPlain = cipher.doFinal(bCipher);
+        String sPlain = new String(bPlain);
+        return sPlain;
+    }
+
+    public Map<String, String> generator() throws NoSuchAlgorithmException {
+        SecureRandom secureRandom = new SecureRandom();
+        try {
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+            keyPairGenerator.initialize(2048, secureRandom);
+            KeyPair keyPair = keyPairGenerator.genKeyPair();
+            PublicKey publicKey = keyPair.getPublic();
+            PrivateKey privateKey = keyPair.getPrivate();
+            byte[] bPublicKey = publicKey.getEncoded();
+            String sPublicKey = Base64.encodeBase64String(bPublicKey);
+            byte[] bPrivateKey = privateKey.getEncoded();
+            String sPrivateKey = Base64.encodeBase64String(bPrivateKey);
+            Map<String, String> rtnMap = new LinkedHashMap<>();
+            rtnMap.put("sPublicKey", sPublicKey);
+            rtnMap.put("sPrivateKey", sPrivateKey);
+            return rtnMap;
+        } catch (NoSuchAlgorithmException e) {
+            throw e;
         }
-        return sb.toString();
+    }
+
+    public Map<String, String> makeModules() throws NoSuchAlgorithmException, InvalidKeySpecException {
+        if (this.publicKeyExponent == null || this.publicKeyModulus == null) {
+            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+            byte[] bPublicKey = Base64.decodeBase64(this.sPublicKey.getBytes());
+            X509EncodedKeySpec publicKeySpec = new X509EncodedKeySpec(bPublicKey);
+            PublicKey publicKey = keyFactory.generatePublic(publicKeySpec);
+            RSAPublicKeySpec publicSpec = (RSAPublicKeySpec) keyFactory.getKeySpec(publicKey, RSAPublicKeySpec.class);
+            BigInteger m = publicSpec.getModulus();
+            BigInteger e = publicSpec.getPublicExponent();
+            this.publicKeyModulus = Base64.encodeBase64String(m.toByteArray());
+            this.publicKeyExponent = Base64.encodeBase64String(e.toByteArray());
+        }
+        Map<String, String> rtnMap = new LinkedHashMap<>();
+        rtnMap.put("publicKeyModulus", this.publicKeyModulus);
+        rtnMap.put("publicKeyExponent", this.publicKeyExponent);
+        return rtnMap;
     }
 }
---------------------------------------
-import java.util.Arrays;
-import java.util.List;
 
-/* JADX WARN: Classes with same name are omitted:
-  common-lib-1.0.14.jar:com/kt/idc/common/mask/TestVO.class
- */
-/* loaded from: common-lib-1.0.9.jar:com/kt/idc/common/mask/TestVO.class */
-public class TestVO {
+-----------------------------------------------
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import org.apache.commons.codec.binary.Hex;
 
-    @Mask(rule = MaskRule.NAME)
-    private String name;
 
-    @Mask(rule = MaskRule.NAME)
-    private String enName;
+public class Sha256 {
+    byte[] saltKeyBytes = null;
 
-    @Mask(rule = MaskRule.PASSPORT)
-    private String passport;
-
-    @Mask(rule = MaskRule.PHONE)
-    private String phone1;
-
-    @Mask(rule = MaskRule.PHONE)
-    private String phone2;
-
-    @Mask(rule = MaskRule.EMAIL)
-    private String email;
-
-    @Mask(rule = MaskRule.BANK_ACCOUNT)
-    private String bankAccount;
-
-    @Mask(rule = MaskRule.IPV4)
-    private String ipv4;
-
-    @Mask(rule = MaskRule.NAME)
-    private String[] names;
-
-    @Mask(rule = MaskRule.EMAIL)
-    private List<String> emailList;
-
-    /* JADX WARN: Classes with same name are omitted:
-  common-lib-1.0.14.jar:com/kt/idc/common/mask/TestVO$TestVOBuilder.class
- */
-    /* loaded from: common-lib-1.0.9.jar:com/kt/idc/common/mask/TestVO$TestVOBuilder.class */
-    public static class TestVOBuilder {
-        private String name;
-        private String enName;
-        private String passport;
-        private String phone1;
-        private String phone2;
-        private String email;
-        private String bankAccount;
-        private String ipv4;
-        private String[] names;
-        private List<String> emailList;
-
-        TestVOBuilder() {
+    public String encode(CharSequence rawPassword, String saltKey) throws Exception {
+        if (saltKey == null || saltKey.trim().contentEquals("")) {
+            throw new Exception("Salt key가 존재하지 않습니다.");
         }
-
-        public TestVOBuilder name(String name) {
-            this.name = name;
-            return this;
+        byte[] saltKeyBytes = Hex.decodeHex(saltKey);
+        if (saltKeyBytes.length < 10) {
+            throw new InvalidKeyException("Invalid key (salt key 10 byte 이상어야 합니다.) ");
         }
-
-        public TestVOBuilder enName(String enName) {
-            this.enName = enName;
-            return this;
-        }
-
-        public TestVOBuilder passport(String passport) {
-            this.passport = passport;
-            return this;
-        }
-
-        public TestVOBuilder phone1(String phone1) {
-            this.phone1 = phone1;
-            return this;
-        }
-
-        public TestVOBuilder phone2(String phone2) {
-            this.phone2 = phone2;
-            return this;
-        }
-
-        public TestVOBuilder email(String email) {
-            this.email = email;
-            return this;
-        }
-
-        public TestVOBuilder bankAccount(String bankAccount) {
-            this.bankAccount = bankAccount;
-            return this;
-        }
-
-        public TestVOBuilder ipv4(String ipv4) {
-            this.ipv4 = ipv4;
-            return this;
-        }
-
-        public TestVOBuilder names(String[] names) {
-            this.names = names;
-            return this;
-        }
-
-        public TestVOBuilder emailList(List<String> emailList) {
-            this.emailList = emailList;
-            return this;
-        }
-
-        public TestVO build() {
-            return new TestVO(this.name, this.enName, this.passport, this.phone1, this.phone2, this.email, this.bankAccount, this.ipv4, this.names, this.emailList);
-        }
-
-        public String toString() {
-            return "TestVO.TestVOBuilder(name=" + this.name + ", enName=" + this.enName + ", passport=" + this.passport + ", phone1=" + this.phone1 + ", phone2=" + this.phone2 + ", email=" + this.email + ", bankAccount=" + this.bankAccount + ", ipv4=" + this.ipv4 + ", names=" + Arrays.deepToString(this.names) + ", emailList=" + this.emailList + ")";
-        }
+        MessageDigest md = MessageDigest.getInstance("SHA-256");
+        md.update(saltKeyBytes);
+        md.update(rawPassword.toString().getBytes(StandardCharsets.UTF_8));
+        String encodedPassword = String.format("%040X", new BigInteger(1, md.digest()));
+        return encodedPassword;
     }
 
-    public String getName() {
-        return this.name;
-    }
-
-    public String getEnName() {
-        return this.enName;
-    }
-
-    public String getPassport() {
-        return this.passport;
-    }
-
-    public String getPhone1() {
-        return this.phone1;
-    }
-
-    public String getPhone2() {
-        return this.phone2;
-    }
-
-    public String getEmail() {
-        return this.email;
-    }
-
-    public String getBankAccount() {
-        return this.bankAccount;
-    }
-
-    public String getIpv4() {
-        return this.ipv4;
-    }
-
-    public String[] getNames() {
-        return this.names;
-    }
-
-    public List<String> getEmailList() {
-        return this.emailList;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public void setEnName(String enName) {
-        this.enName = enName;
-    }
-
-    public void setPassport(String passport) {
-        this.passport = passport;
-    }
-
-    public void setPhone1(String phone1) {
-        this.phone1 = phone1;
-    }
-
-    public void setPhone2(String phone2) {
-        this.phone2 = phone2;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public void setBankAccount(String bankAccount) {
-        this.bankAccount = bankAccount;
-    }
-
-    public void setIpv4(String ipv4) {
-        this.ipv4 = ipv4;
-    }
-
-    public void setNames(String[] names) {
-        this.names = names;
-    }
-
-    public void setEmailList(List<String> emailList) {
-        this.emailList = emailList;
-    }
-
-    public boolean equals(Object o) {
-        if (o == this) {
-            return true;
-        }
-        if (!(o instanceof TestVO)) {
-            return false;
-        }
-        TestVO other = (TestVO) o;
-        if (!other.canEqual(this)) {
-            return false;
-        }
-        Object this$name = getName();
-        Object other$name = other.getName();
-        if (this$name == null) {
-            if (other$name != null) {
-                return false;
-            }
-        } else if (!this$name.equals(other$name)) {
-            return false;
-        }
-        Object this$enName = getEnName();
-        Object other$enName = other.getEnName();
-        if (this$enName == null) {
-            if (other$enName != null) {
-                return false;
-            }
-        } else if (!this$enName.equals(other$enName)) {
-            return false;
-        }
-        Object this$passport = getPassport();
-        Object other$passport = other.getPassport();
-        if (this$passport == null) {
-            if (other$passport != null) {
-                return false;
-            }
-        } else if (!this$passport.equals(other$passport)) {
-            return false;
-        }
-        Object this$phone1 = getPhone1();
-        Object other$phone1 = other.getPhone1();
-        if (this$phone1 == null) {
-            if (other$phone1 != null) {
-                return false;
-            }
-        } else if (!this$phone1.equals(other$phone1)) {
-            return false;
-        }
-        Object this$phone2 = getPhone2();
-        Object other$phone2 = other.getPhone2();
-        if (this$phone2 == null) {
-            if (other$phone2 != null) {
-                return false;
-            }
-        } else if (!this$phone2.equals(other$phone2)) {
-            return false;
-        }
-        Object this$email = getEmail();
-        Object other$email = other.getEmail();
-        if (this$email == null) {
-            if (other$email != null) {
-                return false;
-            }
-        } else if (!this$email.equals(other$email)) {
-            return false;
-        }
-        Object this$bankAccount = getBankAccount();
-        Object other$bankAccount = other.getBankAccount();
-        if (this$bankAccount == null) {
-            if (other$bankAccount != null) {
-                return false;
-            }
-        } else if (!this$bankAccount.equals(other$bankAccount)) {
-            return false;
-        }
-        Object this$ipv4 = getIpv4();
-        Object other$ipv4 = other.getIpv4();
-        if (this$ipv4 == null) {
-            if (other$ipv4 != null) {
-                return false;
-            }
-        } else if (!this$ipv4.equals(other$ipv4)) {
-            return false;
-        }
-        if (!Arrays.deepEquals(getNames(), other.getNames())) {
-            return false;
-        }
-        Object this$emailList = getEmailList();
-        Object other$emailList = other.getEmailList();
-        return this$emailList == null ? other$emailList == null : this$emailList.equals(other$emailList);
-    }
-
-    protected boolean canEqual(Object other) {
-        return other instanceof TestVO;
-    }
-
-    public int hashCode() {
-        Object $name = getName();
-        int result = (1 * 59) + ($name == null ? 43 : $name.hashCode());
-        Object $enName = getEnName();
-        int result2 = (result * 59) + ($enName == null ? 43 : $enName.hashCode());
-        Object $passport = getPassport();
-        int result3 = (result2 * 59) + ($passport == null ? 43 : $passport.hashCode());
-        Object $phone1 = getPhone1();
-        int result4 = (result3 * 59) + ($phone1 == null ? 43 : $phone1.hashCode());
-        Object $phone2 = getPhone2();
-        int result5 = (result4 * 59) + ($phone2 == null ? 43 : $phone2.hashCode());
-        Object $email = getEmail();
-        int result6 = (result5 * 59) + ($email == null ? 43 : $email.hashCode());
-        Object $bankAccount = getBankAccount();
-        int result7 = (result6 * 59) + ($bankAccount == null ? 43 : $bankAccount.hashCode());
-        Object $ipv4 = getIpv4();
-        int result8 = (((result7 * 59) + ($ipv4 == null ? 43 : $ipv4.hashCode())) * 59) + Arrays.deepHashCode(getNames());
-        Object $emailList = getEmailList();
-        return (result8 * 59) + ($emailList == null ? 43 : $emailList.hashCode());
-    }
-
-    public String toString() {
-        return "TestVO(name=" + getName() + ", enName=" + getEnName() + ", passport=" + getPassport() + ", phone1=" + getPhone1() + ", phone2=" + getPhone2() + ", email=" + getEmail() + ", bankAccount=" + getBankAccount() + ", ipv4=" + getIpv4() + ", names=" + Arrays.deepToString(getNames()) + ", emailList=" + getEmailList() + ")";
-    }
-
-    TestVO(String name, String enName, String passport, String phone1, String phone2, String email, String bankAccount, String ipv4, String[] names, List<String> emailList) {
-        this.name = name;
-        this.enName = enName;
-        this.passport = passport;
-        this.phone1 = phone1;
-        this.phone2 = phone2;
-        this.email = email;
-        this.bankAccount = bankAccount;
-        this.ipv4 = ipv4;
-        this.names = names;
-        this.emailList = emailList;
-    }
-
-    public static TestVOBuilder builder() {
-        return new TestVOBuilder();
+    public String generateSaltKey() throws NoSuchAlgorithmException {
+        KeyGenerator keygen = KeyGenerator.getInstance("AES");
+        keygen.init(128);
+        SecretKey skey = keygen.generateKey();
+        return Hex.encodeHexString(skey.getEncoded());
     }
 }
----------------------------------------------------------
+-----------------------------
+
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+
+public class TestApp {
+    public static void main(String[] args) throws NoSuchAlgorithmException, InvalidKeySpecException {
+        RSAManager rsaManager = new RSAManager();
+        System.out.println(rsaManager.generator());
+        System.out.println(rsaManager.makeModules2());
+    }
+}
