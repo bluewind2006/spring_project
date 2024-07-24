@@ -1,0 +1,64 @@
+물론입니다. FileUploadController 클래스와 해당 클래스 내 메소드들을 자세히 설명드리겠습니다.
+
+FileUploadController 클래스
+이 클래스는 Spring Framework를 사용하여 파일 업로드 및 다운로드 기능을 제공하는 컨트롤러입니다. 주요 역할은 클라이언트로부터 파일을 업로드 받고, 저장된 파일을 다운로드할 수 있도록 처리하는 것입니다.
+
+클래스 속성
+fileStorePath: 파일을 저장할 디렉토리 경로를 설정합니다.
+allowedExtensions: 허용되는 파일 확장자의 배열입니다.
+maxSize: 업로드 파일의 최대 크기입니다.
+downloadExtensions: 다운로드 허용 확장자의 배열입니다.
+tika: Apache Tika 라이브러리를 사용하여 파일의 MIME 타입을 감지합니다.
+random: SecureRandom 인스턴스로, 랜덤 파일 이름을 생성하는 데 사용됩니다.
+클래스 상수
+FILENAME_PATTERN: 파일 이름의 유효성을 검사하는 정규 표현식입니다.
+INVALID_FILENAMES: 파일 이름으로 사용할 수 없는 예약된 이름의 집합입니다.
+클래스 메소드
+index(Map<String, Object> model)
+역할: 업로드된 파일 목록을 모델에 추가하여 인덱스 페이지로 반환합니다.
+설명: listUploadedFiles 메소드를 호출하여 파일 목록을 가져온 후, 이를 모델에 추가하여 뷰에서 사용할 수 있도록 합니다.
+handleFileUpload(@RequestParam("file") @NotNull MultipartFile file, RedirectAttributes redirectAttributes)
+역할: 클라이언트로부터 파일을 업로드받아 서버에 저장합니다.
+설명: 파일 이름 검증, 확장자 검증, 파일 크기 검증, MIME 타입 검증 등 다양한 검증을 수행하고, 검증을 통과한 파일을 저장 디렉토리에 저장합니다. 저장된 파일의 이름은 랜덤하게 생성됩니다.
+downloadFile(@PathVariable("filename") String filename)
+역할: 클라이언트에게 파일을 다운로드할 수 있도록 합니다.
+설명: 요청된 파일 이름을 검증하고, 파일이 존재하는 경우 해당 파일을 바이트 배열로 읽어와 클라이언트에게 반환합니다. 파일의 MIME 타입을 감지하여 적절한 Content-Type 헤더를 설정합니다.
+검증 및 유틸리티 메소드
+listUploadedFiles()
+역할: 업로드된 파일 목록을 반환합니다.
+설명: 파일 저장 디렉토리에서 파일 목록을 가져와 리스트로 반환합니다.
+generateRandomFileName(String extension)
+역할: 확장자를 포함한 랜덤 파일 이름을 생성합니다.
+설명: UUID를 이용하여 고유한 파일 이름을 생성합니다.
+isValidMimeType(MultipartFile file, String extension)
+역할: 파일의 MIME 타입을 검증합니다.
+설명: Tika 라이브러리를 사용하여 파일의 MIME 타입을 감지하고, 파일 확장자와 MIME 타입이 일치하는지 확인합니다.
+containsNullByte(String filename)
+역할: 파일 이름에 Null Byte가 포함되어 있는지 확인합니다.
+설명: 파일 이름에 Null Byte가 있는 경우 보안 취약점이 발생할 수 있으므로 이를 방지합니다.
+containsInvalidPath(String filename)
+역할: 파일 경로가 유효한지 검증합니다.
+설명: 파일 경로가 파일 저장 디렉토리 내에 있는지 확인하여 디렉토리 트래버설 공격을 방지합니다.
+isValidFilename(String filename)
+역할: 파일 이름이 유효한지 검증합니다.
+설명: 예약된 파일 이름인지, 정규 표현식 패턴에 맞는지 확인합니다.
+getSafeFilePath(String filename)
+역할: 파일 저장 경로를 안전하게 생성합니다.
+설명: 파일 저장 디렉토리를 기준으로 파일 경로를 생성하고, 이를 정규화하여 반환합니다.
+sanitizeFilename(String filename)
+역할: 파일 이름을 안전하게 변환합니다.
+설명: 유효하지 않은 문자를 언더스코어(_)로 대체하여 파일 이름을 변환합니다.
+sanitizeHeaderFilename(String filename)
+역할: HTTP 헤더에 사용할 파일 이름을 안전하게 변환합니다.
+설명: 파일 이름에 포함된 줄 바꿈 문자를 언더스코어(_)로 대체합니다.
+hasPotentiallyDangerousContent(MultipartFile file, String extension)
+역할: 파일에 잠재적으로 위험한 콘텐츠가 포함되어 있는지 검사합니다.
+설명: 특정 확장자에 대해 알려진 공격 패턴을 검색하여 위험한 파일을 탐지합니다.
+예외 클래스
+FileUploadException
+역할: 파일 업로드 과정에서 발생하는 일반적인 예외를 처리합니다.
+FileSizeExceededException
+역할: 파일 크기가 허용된 최대 크기를 초과할 때 발생하는 예외입니다.
+FileExtensionNotAllowedException
+역할: 허용되지 않은 확장자의 파일을 업로드할 때 발생하는 예외입니다.
+이 클래스를 통해 서버는 파일 업로드와 다운로드를 안전하게 처리할 수 있으며, 다양한 검증과 예외 처리를 통해 보안을 강화합니다.
