@@ -18,3 +18,82 @@ SHA-256 해싱:
 소금을 생성
 평문을 소금과 함께 해시
 해시된 값이 평문과 소금으로 검증되는지 확인
+
+
+SanitizationUtil 클래스와 그 메서드에 대한 자세한 설명을 드리겠습니다. 이 클래스는 사용자 입력을 정리(sanitize)하여 CRLF(Carriage Return Line Feed) 인젝션 공격을 방어하는 데 사용됩니다.
+
+SanitizationUtil 클래스
+클래스 정의
+java
+코드 복사
+package com.example.demo.util;
+
+import java.util.regex.Pattern;
+
+public class SanitizationUtil {
+
+    // Private constructor to prevent instantiation
+    private SanitizationUtil() {
+        // Utility class, prevent instantiation
+    }
+
+    // Pattern to match CRLF characters and various encoded forms
+    private static final Pattern CRLF_PATTERN = Pattern.compile(
+        "(%0D|%0A|%0d|%0a|\\r|\\n|\\\\r|\\\\n|%25|\\u000A|%25250A|%%0A0A|%25%30A|%25%30%61|%5cr|%5cn|%E5%98%8A|%E5%98%8D|%2e%2e%2f|%2F%2E%2E|%3C|%3E|%0D%0A)+",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    public static String sanitizeInput(String input) {
+        if (input == null) {
+            return null;
+        }
+        return CRLF_PATTERN.matcher(input).replaceAll("");
+    }
+}
+클래스 설명
+패키지 및 임포트:
+
+package com.example.demo.util;: 클래스가 속한 패키지입니다.
+import java.util.regex.Pattern;: 정규 표현식을 사용하기 위한 Pattern 클래스 임포트.
+클래스 선언:
+
+public class SanitizationUtil: 클래스는 공개(Public) 클래스이며, 다른 패키지에서도 접근 가능합니다.
+프라이빗 생성자:
+
+private SanitizationUtil(): 이 생성자는 클래스가 인스턴스화되지 않도록 막기 위해 프라이빗으로 선언되었습니다. SanitizationUtil 클래스는 유틸리티 클래스이며, 정적 메서드만을 제공하므로 인스턴스를 만들 필요가 없습니다.
+// Utility class, prevent instantiation: 생성자가 프라이빗인 이유를 설명하는 주석입니다.
+정규 표현식 패턴:
+
+private static final Pattern CRLF_PATTERN: 정적(final) 필드로 선언된 Pattern 객체는 CRLF 문자 및 그 인코딩된 형태를 매칭합니다.
+Pattern.compile("..."): 정규 표현식을 컴파일하여 Pattern 객체를 생성합니다.
+정규 표현식의 내용:
+%0D: URL 인코딩된 CR(Carriage Return).
+%0A: URL 인코딩된 LF(Line Feed).
+\\r: Carriage Return 문자.
+\\n: Line Feed 문자.
+\\\\r: 역슬래시와 r 문자 (이중 역슬래시로 이스케이프됨).
+\\\\n: 역슬래시와 n 문자 (이중 역슬래시로 이스케이프됨).
+%25: 퍼센트 기호(%).
+\\u000A: 유니코드 LF.
+기타 여러 가지 변형된 인코딩 및 이스케이프된 문자들.
+sanitizeInput 메서드:
+
+public static String sanitizeInput(String input): 이 메서드는 입력된 문자열에서 CRLF 패턴을 제거합니다.
+매개변수: String input: 사용자 입력 문자열.
+반환값: String: 정리된 문자열.
+동작:
+if (input == null) { return null; }: 입력이 null이면 null을 반환합니다.
+return CRLF_PATTERN.matcher(input).replaceAll("");: 정규 표현식을 사용하여 입력 문자열에서 CRLF 패턴을 찾아 제거한 후 반환합니다.
+메서드 설명
+sanitizeInput 메서드
+정적 메서드: 이 메서드는 클래스의 인스턴스 없이 호출될 수 있습니다.
+입력 파라미터:
+String input: 사용자로부터 입력받은 문자열.
+반환 값:
+정리된 문자열 (CRLF 패턴이 제거된 문자열)을 반환합니다.
+입력이 null인 경우 null을 반환합니다.
+동작 과정:
+먼저 입력 문자열이 null인지 확인합니다. null이면 null을 반환합니다.
+입력 문자열에서 CRLF_PATTERN에 해당하는 모든 패턴을 찾아 빈 문자열로 대체합니다.
+CRLF_PATTERN.matcher(input).replaceAll(""): 정규 표현식을 사용하여 입력 문자열을 정리합니다.
+이 클래스와 메서드는 웹 애플리케이션에서 사용자가 입력한 데이터를 안전하게 처리하는 데 유용합니다. 이를 통해 CRLF 인젝션 공격을 방지하고, 입력 데이터가 서버 측에서 안전하게 처리될 수 있도록 보장합니다.
