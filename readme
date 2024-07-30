@@ -32,7 +32,173 @@ Reactive Security	초기 지원	더욱 강화된 지원
 마이그레이션 가이드	-	Java 17 이상으로 업그레이드<br>javax에서 jakarta로 전환<br>WebSecurityConfigurerAdapter에서 SecurityFilterChain으로 전환<br>XML 기반 구성에서 자바 기반 구성으로 전환 권장
 
 
+Spring Security 5.x와 6.x 사이의 기본 보안 설정 부분에서의 주요 변경 사항들을 자세히 설명하겠습니다.
 
+기본 보안 설정 변경 사항
+CSRF (Cross-Site Request Forgery) Protection
+CORS (Cross-Origin Resource Sharing) 설정
+Content Security Policy (CSP)
+HTTP 헤더 보안
+비밀번호 인코딩
+1. CSRF Protection
+Spring Security 5.x
+5.x 버전에서는 CSRF 보호가 기본적으로 활성화되어 있습니다. 대부분의 애플리케이션에서는 기본 설정을 그대로 사용하지만, 필요에 따라 비활성화하거나 커스터마이즈할 수 있습니다.
+
+java
+코드 복사
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http
+        .csrf().disable() // 필요에 따라 비활성화
+        .authorizeRequests()
+            .anyRequest().authenticated();
+}
+Spring Security 6.x
+6.x 버전에서도 CSRF 보호는 기본적으로 활성화되어 있습니다. 그러나 Lambda DSL을 사용하여 보다 간단하게 설정할 수 있습니다.
+
+java
+코드 복사
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .csrf(csrf -> csrf.disable()) // 필요에 따라 비활성화
+        .authorizeHttpRequests(authorizeRequests -> 
+            authorizeRequests.anyRequest().authenticated()
+        );
+    return http.build();
+}
+2. CORS 설정
+Spring Security 5.x
+CORS 설정은 WebMvcConfigurer에서 설정하거나, HttpSecurity에서 직접 설정할 수 있습니다.
+
+java
+코드 복사
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http
+        .cors().and()
+        .authorizeRequests()
+            .anyRequest().authenticated();
+}
+
+// 또는 WebMvcConfigurer에서 설정
+@Bean
+public WebMvcConfigurer corsConfigurer() {
+    return new WebMvcConfigurer() {
+        @Override
+        public void addCorsMappings(CorsRegistry registry) {
+            registry.addMapping("/**").allowedOrigins("http://example.com");
+        }
+    };
+}
+Spring Security 6.x
+Lambda DSL을 사용하여 CORS 설정을 보다 간단하게 정의할 수 있습니다.
+
+java
+코드 복사
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .cors(withDefaults()) // 기본 설정 사용
+        .authorizeHttpRequests(authorizeRequests -> 
+            authorizeRequests.anyRequest().authenticated()
+        );
+    return http.build();
+}
+
+// 또는 별도의 구성 클래스에서 설정
+@Bean
+public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration configuration = new CorsConfiguration();
+    configuration.setAllowedOrigins(Arrays.asList("http://example.com"));
+    configuration.setAllowedMethods(Arrays.asList("GET", "POST"));
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", configuration);
+    return source;
+}
+3. Content Security Policy (CSP)
+Spring Security 5.x
+5.x 버전에서는 Content Security Policy를 수동으로 설정할 수 있습니다.
+
+java
+코드 복사
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http
+        .headers()
+            .contentSecurityPolicy("default-src 'self'; script-src 'self' 'unsafe-inline';");
+}
+Spring Security 6.x
+6.x에서는 Lambda DSL을 사용하여 CSP를 설정할 수 있습니다.
+
+java
+코드 복사
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .headers(headers -> 
+            headers.contentSecurityPolicy(csp -> 
+                csp.policyDirectives("default-src 'self'; script-src 'self' 'unsafe-inline';")
+            )
+        )
+        .authorizeHttpRequests(authorizeRequests -> 
+            authorizeRequests.anyRequest().authenticated()
+        );
+    return http.build();
+}
+4. HTTP 헤더 보안
+Spring Security 5.x
+기본적으로 Spring Security는 다양한 HTTP 헤더 보안을 제공하며, 필요에 따라 추가 설정이 가능합니다.
+
+java
+코드 복사
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http
+        .headers()
+            .xssProtection()
+            .and()
+            .frameOptions().sameOrigin();
+}
+Spring Security 6.x
+Lambda DSL을 사용하여 동일한 설정을 보다 간단하게 정의할 수 있습니다.
+
+java
+코드 복사
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .headers(headers -> 
+            headers
+                .xssProtection(withDefaults())
+                .frameOptions(frameOptions -> frameOptions.sameOrigin())
+        )
+        .authorizeHttpRequests(authorizeRequests -> 
+            authorizeRequests.anyRequest().authenticated()
+        );
+    return http.build();
+}
+5. 비밀번호 인코딩
+Spring Security 5.x
+5.x에서는 DelegatingPasswordEncoder를 사용하여 다양한 비밀번호 인코딩 방식을 지원합니다.
+
+java
+코드 복사
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+}
+Spring Security 6.x
+6.x에서도 DelegatingPasswordEncoder를 사용하지만, 추가적인 비밀번호 인코딩 전략이 도입되었습니다.
+
+java
+코드 복사
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return PasswordEncoderFactories.createDelegatingPasswordEncoder();
+}
+요약
+Spring Security 6.x에서는 보안 설정을 보다 직관적이고 간결하게 정의할 수 있도록 Lambda DSL을 도입했습니다. CSRF 보호, CORS 설정, Content Security Policy, HTTP 헤더 보안, 비밀번호 인코딩 등 다양한 기본 보안 설정이 개선되었습니다. 이러한 변경 사항들은 최신 자바 버전 및 Jakarta EE 9와의 호환성을 높이고, 보안 설정을 보다 쉽게 관리할 수 있도록 도와줍니다.
 
 
 Spring Security 5.x에서 6.x로의 마이그레이션에서 SecurityConfig와 관련된 주요 변경 사항은 다음과 같습니다.
