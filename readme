@@ -19,3 +19,176 @@ SHA-256 해싱:
 평문을 소금과 함께 해시
 해시된 값이 평문과 소금으로 검증되는지 확인
 
+항목	Spring Security 5.x	Spring Security 6.x
+지원 Java 버전	Java 8 및 11	Java 17 이상
+Spring Boot 호환성	Spring Boot 2.x	Spring Boot 3.x
+패키지 네임스페이스	javax 패키지 (javax.servlet, javax.validation 등)	jakarta 패키지 (jakarta.servlet, jakarta.validation 등)
+구성 방식	XML 및 자바 기반 구성<br>WebSecurityConfigurerAdapter	주로 자바 기반 구성<br>SecurityFilterChain, SecurityConfigurer 사용
+OAuth 2.0 및 OpenID Connect	기본적인 지원<br>다양한 인증 서버 및 리소스 서버 구성 가능	강화된 지원<br>더 많은 커스터마이제이션 옵션<br>OAuth 2.0 클라이언트 및 리소스 서버 설정 개선
+Reactive Security	초기 지원	더욱 강화된 지원
+비밀번호 인코딩 전략	DelegatingPasswordEncoder 사용	새로운 비밀번호 인코딩 전략 도입
+기본 보안 설정	다양한 기본 보안 설정 제공	더 많은 기본 보안 헤더와 정책 추가
+커스텀 필터 및 설정	기존 인프라스트럭처	더 유연해진 커스텀 필터 및 인프라스트럭처 설정
+마이그레이션 가이드	-	Java 17 이상으로 업그레이드<br>javax에서 jakarta로 전환<br>WebSecurityConfigurerAdapter에서 SecurityFilterChain으로 전환<br>XML 기반 구성에서 자바 기반 구성으로 전환 권장
+
+
+
+
+
+Spring Security 5.x에서 6.x로의 마이그레이션에서 SecurityConfig와 관련된 주요 변경 사항은 다음과 같습니다.
+
+주요 변경 사항
+WebSecurityConfigurerAdapter 제거
+구성 방식 변경 (Lambda DSL 사용)
+HttpSecurity 구성 변경
+패키지 네임스페이스 변경 (javax에서 jakarta로)
+커스터마이징 옵션 확장
+1. WebSecurityConfigurerAdapter 제거
+Spring Security 5.x
+5.x 버전에서는 WebSecurityConfigurerAdapter를 확장하여 보안 구성을 정의하는 것이 일반적이었습니다.
+
+java
+코드 복사
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+    
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+            .authorizeRequests()
+                .antMatchers("/public/**").permitAll()
+                .anyRequest().authenticated()
+            .and()
+            .formLogin();
+    }
+}
+Spring Security 6.x
+6.x 버전에서는 WebSecurityConfigurerAdapter가 제거되었으며, 대신 SecurityFilterChain을 빈으로 정의하여 사용합니다.
+
+java
+코드 복사
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+    
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .authorizeHttpRequests(authorizeRequests -> 
+                authorizeRequests
+                    .requestMatchers("/public/**").permitAll()
+                    .anyRequest().authenticated()
+            )
+            .formLogin(withDefaults());
+        
+        return http.build();
+    }
+}
+2. 구성 방식 변경 (Lambda DSL 사용)
+6.x에서는 Lambda DSL을 사용하여 보안 구성을 보다 명확하고 간결하게 정의할 수 있습니다.
+
+Spring Security 5.x
+java
+코드 복사
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http
+        .authorizeRequests()
+            .antMatchers("/admin/**").hasRole("ADMIN")
+            .antMatchers("/user/**").hasRole("USER")
+            .anyRequest().authenticated()
+        .and()
+        .formLogin()
+        .and()
+        .logout();
+}
+Spring Security 6.x
+java
+코드 복사
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .authorizeHttpRequests(authorizeRequests -> 
+            authorizeRequests
+                .requestMatchers("/admin/**").hasRole("ADMIN")
+                .requestMatchers("/user/**").hasRole("USER")
+                .anyRequest().authenticated()
+        )
+        .formLogin(withDefaults())
+        .logout(withDefaults());
+    
+    return http.build();
+}
+3. HttpSecurity 구성 변경
+HttpSecurity 구성 시 메소드 체이닝 대신 메소드 참조 방식이 도입되었습니다.
+
+Spring Security 5.x
+java
+코드 복사
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http
+        .csrf().disable()
+        .authorizeRequests()
+            .antMatchers("/api/**").hasRole("API_USER")
+            .anyRequest().authenticated()
+        .and()
+        .httpBasic();
+}
+Spring Security 6.x
+java
+코드 복사
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .csrf(csrf -> csrf.disable())
+        .authorizeHttpRequests(authorizeRequests -> 
+            authorizeRequests
+                .requestMatchers("/api/**").hasRole("API_USER")
+                .anyRequest().authenticated()
+        )
+        .httpBasic(withDefaults());
+    
+    return http.build();
+}
+4. 패키지 네임스페이스 변경 (javax에서 jakarta로)
+6.x 버전부터는 Jakarta EE 9로 전환됨에 따라 패키지 네임스페이스가 javax에서 jakarta로 변경되었습니다. 예를 들어 javax.servlet 패키지는 jakarta.servlet로 대체됩니다.
+
+5. 커스터마이징 옵션 확장
+6.x에서는 다양한 보안 설정 옵션이 확장되었으며, 이를 통해 더 많은 커스터마이징이 가능합니다.
+
+Spring Security 5.x
+java
+코드 복사
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http
+        .rememberMe()
+            .tokenValiditySeconds(86400)
+            .key("mySecretKey")
+        .and()
+        .sessionManagement()
+            .maximumSessions(1)
+            .expiredUrl("/session-expired.html");
+}
+Spring Security 6.x
+java
+코드 복사
+@Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .rememberMe(rememberMe -> 
+            rememberMe
+                .tokenValiditySeconds(86400)
+                .key("mySecretKey")
+        )
+        .sessionManagement(sessionManagement -> 
+            sessionManagement
+                .maximumSessions(1)
+                .expiredUrl("/session-expired.html")
+        );
+    
+    return http.build();
+}
+결론
+Spring Security 6.x는 보안 구성을 더욱 직관적이고 간결하게 만들기 위해 여러 변경 사항을 도입했습니다. WebSecurityConfigurerAdapter의 제거, Lambda DSL의 도입, 패키지 네임스페이스 변경 등이 주요 변화입니다. 이러한 변경 사항들은 보안 구성을 보다 명확하게 하고, 최신 자바 버전 및 Jakarta EE 9와의 호환성을 높이는 데 중점을 두고 있습니다.
