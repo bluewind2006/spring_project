@@ -16,3 +16,116 @@ Use Javascript to update an HTML hidden input value
 
 Javascript를 사용하여 hidden input 값을 업데이트.
 Spring Security 6.x는 보안 구성을 더욱 직관적이고 간결하게 만들기 위해 여러 변경 사항을 도입했습니다. WebSecurityConfigurerAdapter의 제거, Lambda DSL의 도입, 패키지 네임스페이스 변경 등이 주요 변화입니다. 이러한 변경 사항들은 보안 구성을 보다 명확하게 하고, 최신 자바 버전 및 Jakarta EE 9와의 호환성을 높이는 데 중점을 두고 있습니다.
+
+
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.HttpsURLConnection;
+import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
+import javax.net.ssl.SSLPeerUnverifiedException;
+import java.util.regex.Pattern;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.List;
+import java.util.ArrayList;
+
+public class KubernetesHostnameVerifier implements HostnameVerifier {
+    private final List<Pattern> allowedPatterns;
+    private final String configPath;
+    private long lastConfigCheck;
+    private static final long CONFIG_REFRESH_INTERVAL = 60000; // 1분
+
+    public KubernetesHostnameVerifier(String configPath) {
+        this.configPath = configPath;
+        this.allowedPatterns = new ArrayList<>();
+        this.lastConfigCheck = 0;
+        loadAllowedPatterns();
+    }
+
+    private void loadAllowedPatterns() {
+        try {
+            List<String> patterns = Files.readAllLines(Paths.get(configPath));
+            synchronized (allowedPatterns) {
+                allowedPatterns.clear();
+                for (String pattern : patterns) {
+                    // 쿠버네티스 서비스 패턴 변환
+                    // ex: *.namespace.svc.cluster.local -> ^[a-zA-Z0-9-]+\.namespace\.svc\.cluster\.local$
+                    String regex = pattern
+                        .replace(".", "\\.")
+                        .replace("*", "[a-zA-Z0-9-]+");
+                    allowedPatterns.add(Pattern.compile("^" + regex + "$"));
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load hostname patterns", e);
+        }
+    }
+
+    private boolean shouldReloadConfig() {
+        long currentTime = System.currentTimeMillis();
+        return (currentTime - lastConfigCheck) > CONFIG_REFRESH_INTERVAL;
+    }
+
+    @Override
+    public boolean verify(String hostname, SSLSession session) {
+        if (shouldReloadConfig()) {
+            loadAllowedPatterns();
+            lastConfigCheck = System.currentTimeMillis();
+        }
+
+        try {
+            // 1. 기본 SSL 인증서 검증
+            Certificate[] certs = session.getPeerCertificates();
+            if (certs == null || certs.length == 0) {
+                return false;
+            }
+            
+            X509Certificate serverCert = (X509Certificate) certs[0];
+            try {
+                serverCert.checkValidity();
+            } catch (Exception e) {
+                return false;
+            }
+
+            // 2. 동적 호스트네임 패턴 검증
+            synchronized (allowedPatterns) {
+                for (Pattern pattern : allowedPatterns) {
+                    if (pattern.matcher(hostname).matches()) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+
+        } catch (SSLPeerUnverifiedException e) {
+            return false;
+        }
+    }
+}
+
+// 설정 예시
+public class ConfigExample {
+    public static void setupVerifier() {
+        // 설정 파일 생성 예시
+        String config = """
+            *.default.svc.cluster.local
+            *.staging.svc.cluster.local
+            *.production.svc.cluster.local
+            specific-service.custom-namespace.svc.cluster.local
+            """;
+        
+        try {
+            Files.writeString(Paths.get("/etc/k8s/allowed-hosts.conf"), config);
+            
+            KubernetesHostnameVerifier verifier = 
+                new KubernetesHostnameVerifier("/etc/k8s/allowed-hosts.conf");
+            HttpsURLConnection.setDefaultHostnameVerifier(verifier);
+            
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to setup hostname verifier", e);
+        }
+    }
+}
